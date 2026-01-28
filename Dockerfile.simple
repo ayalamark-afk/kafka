@@ -1,0 +1,18 @@
+# Simple Dockerfile - build JAR and overlay on official image
+# Stage 1: Build only the patched JAR
+FROM eclipse-temurin:21-jdk AS builder
+WORKDIR /kafka
+COPY . .
+RUN ./gradlew :connect:runtime:jar -x test --no-daemon
+
+# Stage 2: Just copy the JAR to official image
+FROM apache/kafka:4.1.1
+
+USER root
+
+# Remove old JAR and copy patched one
+RUN rm -f /opt/kafka/libs/connect-runtime-*.jar
+COPY --from=builder /kafka/connect/runtime/build/libs/connect-runtime-*.jar /opt/kafka/libs/
+RUN chown appuser:appuser /opt/kafka/libs/connect-runtime-*.jar
+
+USER appuser

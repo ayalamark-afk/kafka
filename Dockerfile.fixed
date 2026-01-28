@@ -1,0 +1,25 @@
+# Build Kafka Connect with KAFKA-17676 fix
+FROM eclipse-temurin:21-jdk AS builder
+
+WORKDIR /kafka
+COPY . .
+
+# Build connect-runtime module only
+RUN ./gradlew :connect:runtime:jar -x test --no-daemon && \
+    ls -la connect/runtime/build/libs/
+
+# Final image - use 4.1.1 (latest stable)
+FROM apache/kafka:4.1.1
+
+USER root
+
+# Copy patched JAR
+COPY --from=builder /kafka/connect/runtime/build/libs/connect-runtime-*.jar /tmp/
+
+# Replace original JAR
+RUN rm -f /opt/kafka/libs/connect-runtime-*.jar && \
+    cp /tmp/connect-runtime-*.jar /opt/kafka/libs/ && \
+    rm /tmp/*.jar && \
+    chown appuser:appuser /opt/kafka/libs/connect-runtime-*.jar
+
+USER appuser
